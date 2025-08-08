@@ -1,0 +1,16 @@
+$ forge test test/Bank.t.sol
+[⠒] Compiling...
+No files changed, compilation skipped
+
+Ran 8 tests for test/Bank.t.sol:BankTest
+[PASS] test_AdminWithdrawSuccess() (gas: 121931)
+[PASS] test_DepositUpdatesUserBalance() (gas: 110031)
+[PASS] test_TopDepositors_SameUserMultipleDeposits() (gas: 221857)
+[PASS] test_TopDepositors_With1User() (gas: 113085)
+[PASS] test_TopDepositors_With2Users() (gas: 208652)
+[PASS] test_TopDepositors_With3Users() (gas: 272511)
+[PASS] test_TopDepositors_With4Users() (gas: 307631)
+[PASS] test_WithdrawOnlyByAdmin() (gas: 112445)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 3.58ms (2.39ms CPU time)
+
+Ran 1 test suite in 30.64ms (3.58ms CPU time): 8 tests passed, 0 failed, 0 skipped (8 total tests)
