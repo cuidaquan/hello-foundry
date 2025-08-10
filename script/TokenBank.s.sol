@@ -8,7 +8,7 @@ import "../src/TokenBank.sol";
 contract TokenBankScript is BaseScript {
 
     function run() public broadcaster {
-        TokenBank token = new TokenBank(0x73f6DD16d0Aa5322560556605cf4c86Bd045Ee55);
+        TokenBank token = new TokenBank(0x89865AAF2251b10ffc80CE4A809522506BF10bA2);
         console.log("TokenBank deployed on %s", address(token));
         saveContract("TokenBank", address(token));
     }

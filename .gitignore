@@ -14,3 +14,4 @@ docs/
 .env
 cmd
 broadcast/
+token-bank-front/node_modules/

@@ -52,17 +52,18 @@ contract ExtendedERC20 is ERC20, Ownable {
      * @param data 附加数据
      * @return 转账是否成功
      */
-    function transferWithCallback(
+    // 内部实现，避免使用 this. 导致 msg.sender 变为合约地址
+    function _transferWithCallback(
         address to,
         uint256 amount,
-        bytes calldata data
-    ) external returns (bool) {
+        bytes memory data
+    ) internal returns (bool) {
         // 执行标准转账
         require(to != address(0), "ERC20: transfer to the zero address");
         require(balanceOf(msg.sender) >= amount, "ERC20: transfer amount exceeds balance");
-        
+
         _transfer(msg.sender, to, amount);
-        
+
         // 如果目标地址是合约，调用其tokensReceived方法
         if (isContract(to)) {
             try ITokenReceiver(to).tokensReceived(msg.sender, amount, data) returns (bool success) {
@@ -71,10 +72,18 @@ contract ExtendedERC20 is ERC20, Ownable {
                 revert("Token transfer callback failed");
             }
         }
-        
+
         return true;
     }
-    
+
+    function transferWithCallback(
+        address to,
+        uint256 amount,
+        bytes calldata data
+    ) public returns (bool) {
+        return _transferWithCallback(to, amount, data);
+    }
+
     /**
      * @dev 重载transferWithCallback，不带data参数
      * @param to 接收地址
@@ -84,8 +93,8 @@ contract ExtendedERC20 is ERC20, Ownable {
     function transferWithCallback(
         address to,
         uint256 amount
-    ) external returns (bool) {
-        return this.transferWithCallback(to, amount, "");
+    ) public returns (bool) {
+        return _transferWithCallback(to, amount, "");
     }
     
     /**
