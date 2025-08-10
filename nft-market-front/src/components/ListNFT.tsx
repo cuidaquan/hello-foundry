@@ -3,12 +3,13 @@ import { useAccount, useReadContract, useWriteContract, useWaitForTransactionRec
 import { parseEther, formatEther } from 'viem'
 import { MyNFTABI, MY_NFT_ADDRESS } from '../contracts/MyNFT'
 import { NFTMarketABI, NFT_MARKET_ADDRESS } from '../contracts/NFTMarket'
-
-interface NFT {
-  tokenId: bigint
-  tokenURI: string
-  isApproved: boolean
-}
+import {
+  NFTWithMetadata as NFT,
+  createTokenURIContracts,
+  batchUpdateNFTMetadata,
+  getDefaultNFTName,
+  handleImageError
+} from '../utils/nftUtils'
 
 interface ListNFTProps {
   onListedSuccess?: () => void
@@ -25,6 +26,8 @@ const ListNFT: React.FC<ListNFTProps> = ({ onListedSuccess }) => {
   const [approvedNFTs, setApprovedNFTs] = useState<Set<string>>(new Set())
   const [currentApprovingNFT, setCurrentApprovingNFT] = useState<bigint | null>(null)
 
+
+
   const { writeContract, data: hash, isPending } = useWriteContract()
   
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
@@ -39,34 +42,66 @@ const ListNFT: React.FC<ListNFTProps> = ({ onListedSuccess }) => {
     args: address ? [address] : undefined,
   })
 
-  // 获取 NFT 详细信息
-  useEffect(() => {
-    const fetchNFTDetails = async () => {
-      if (!tokenIds || tokenIds.length === 0) {
-        setUserNFTs([])
-        return
-      }
+  // 创建批量读取tokenURI的配置
+  const tokenURIContracts = createTokenURIContracts(tokenIds, MY_NFT_ADDRESS, MyNFTABI)
 
+  // 批量获取所有tokenURI
+  const { data: tokenURIsData, isLoading: tokenURIsLoading } = useReadContracts({
+    contracts: tokenURIContracts,
+  })
+
+  // 处理获取到的tokenURI数据
+  useEffect(() => {
+    if (!tokenIds || tokenIds.length === 0) {
+      setUserNFTs([])
+      setLoading(false)
+      return
+    }
+
+    if (tokenURIsLoading) {
+      setLoading(true)
+      return
+    }
+
+    const initializeNFTs = async () => {
       setLoading(true)
       try {
         const nftDetails: NFT[] = []
 
-        for (const tokenId of tokenIds) {
-          // 简单的 tokenURI，实际项目中可以调用合约获取
-          const tokenURI = `My NFT #${tokenId.toString()}`
-
-          // 检查是否已授权给市场合约
-          // 检查本地状态中是否已标记为授权
+        for (let i = 0; i < tokenIds.length; i++) {
+          const tokenId = tokenIds[i]
           const isApproved = approvedNFTs.has(tokenId.toString())
 
-          nftDetails.push({
+          // 获取tokenURI
+          let tokenURI = `My NFT #${tokenId.toString()}` // 默认值
+          if (tokenURIsData && tokenURIsData[i] && tokenURIsData[i].status === 'success') {
+            const result = tokenURIsData[i].result
+            if (typeof result === 'string' && result) {
+              tokenURI = result
+            }
+          }
+
+          // 初始化NFT对象
+          const nft: NFT = {
             tokenId,
             tokenURI,
-            isApproved
-          })
+            isApproved,
+            imageLoading: true
+          }
+
+          nftDetails.push(nft)
         }
 
         setUserNFTs(nftDetails)
+
+        // 异步获取每个NFT的元数据
+        await batchUpdateNFTMetadata(
+          nftDetails,
+          tokenURIsData,
+          setUserNFTs,
+          (nft) => nft.tokenId,
+          (nft) => nft.tokenId
+        )
       } catch (err) {
         console.error('获取 NFT 详情失败:', err)
         setError('获取 NFT 详情失败')
@@ -75,8 +110,8 @@ const ListNFT: React.FC<ListNFTProps> = ({ onListedSuccess }) => {
       }
     }
 
-    fetchNFTDetails()
-  }, [tokenIds])
+    initializeNFTs()
+  }, [tokenIds, tokenURIsData, tokenURIsLoading, approvedNFTs])
 
   // 授权 NFT 给市场合约
   const handleApprove = async (tokenId: bigint) => {
@@ -186,50 +221,85 @@ const ListNFT: React.FC<ListNFTProps> = ({ onListedSuccess }) => {
           <div className="grid">
             {userNFTs.map((nft) => (
               <div key={nft.tokenId.toString()} className="nft-card">
-                <div className="nft-image" style={{ 
-                  background: `linear-gradient(45deg, #${nft.tokenId.toString(16).padStart(6, '0')}, #${(Number(nft.tokenId) * 123456).toString(16).slice(-6)})`,
+                <div className="nft-image" style={{
+                  background: nft.image ? 'transparent' : `linear-gradient(45deg, #${nft.tokenId.toString(16).padStart(6, '0')}, #${(Number(nft.tokenId) * 123456).toString(16).slice(-6)})`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: 'white',
                   fontSize: '1.2rem',
-                  fontWeight: 'bold'
+                  fontWeight: 'bold',
+                  position: 'relative',
+                  overflow: 'hidden'
                 }}>
-                  NFT #{nft.tokenId.toString()}
-                </div>
-                <h3>{nft.tokenURI}</h3>
-                <div style={{ marginTop: '1rem' }}>
-                  {!nft.isApproved ? (
-                    <div>
-                      <button
-                        onClick={() => handleApprove(nft.tokenId)}
-                        disabled={isPending || isConfirming}
-                        style={{ width: '100%', marginBottom: '0.5rem' }}
-                      >
-                        {isPending || isConfirming ? '授权中...' : '授权给市场'}
-                      </button>
-                      <p style={{ fontSize: '0.8rem', color: '#999', textAlign: 'center' }}>
-                        需要先授权才能上架
-                      </p>
-                    </div>
+                  {nft.imageLoading ? (
+                    <div style={{ color: '#999' }}>加载中...</div>
+                  ) : nft.image ? (
+                    <img
+                      src={nft.image}
+                      alt={nft.name || `NFT #${nft.tokenId.toString()}`}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover'
+                      }}
+                      onError={(e) => handleImageError(e, nft.tokenId)}
+                    />
                   ) : (
-                    <div>
-                      <button
-                        onClick={() => setSelectedNFT(nft.tokenId)}
-                        disabled={selectedNFT === nft.tokenId}
-                        style={{
-                          width: '100%',
-                          marginBottom: '0.5rem',
-                          backgroundColor: selectedNFT === nft.tokenId ? '#646cff' : '#4CAF50'
-                        }}
-                      >
-                        {selectedNFT === nft.tokenId ? '已选择' : '选择上架'}
-                      </button>
-                      <p style={{ fontSize: '0.8rem', color: '#4CAF50', textAlign: 'center' }}>
-                        ✓ 已授权，可以上架
-                      </p>
-                    </div>
+                    `NFT #${nft.tokenId.toString()}`
                   )}
+                </div>
+                <div style={{ padding: '1rem' }}>
+                  <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.1rem' }}>
+                    {nft.name || getDefaultNFTName(nft.tokenId)}
+                  </h3>
+                  {nft.description && (
+                    <p style={{
+                      margin: '0 0 1rem 0',
+                      fontSize: '0.9rem',
+                      color: '#ccc',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical'
+                    }}>
+                      {nft.description}
+                    </p>
+                  )}
+                  <div style={{ marginTop: '1rem' }}>
+                    {!nft.isApproved ? (
+                      <div>
+                        <button
+                          onClick={() => handleApprove(nft.tokenId)}
+                          disabled={isPending || isConfirming}
+                          style={{ width: '100%', marginBottom: '0.5rem' }}
+                        >
+                          {isPending || isConfirming ? '授权中...' : '授权给市场'}
+                        </button>
+                        <p style={{ fontSize: '0.8rem', color: '#999', textAlign: 'center' }}>
+                          需要先授权才能上架
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <button
+                          onClick={() => setSelectedNFT(nft.tokenId)}
+                          disabled={selectedNFT === nft.tokenId}
+                          style={{
+                            width: '100%',
+                            marginBottom: '0.5rem',
+                            backgroundColor: selectedNFT === nft.tokenId ? '#646cff' : '#4CAF50'
+                          }}
+                        >
+                          {selectedNFT === nft.tokenId ? '已选择' : '选择上架'}
+                        </button>
+                        <p style={{ fontSize: '0.8rem', color: '#4CAF50', textAlign: 'center' }}>
+                          ✓ 已授权，可以上架
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
