@@ -16,3 +16,6 @@ cmd
 broadcast/
 token-bank-front/node_modules/
 token-bank-front/.env.local
+nft-market-front/node_modules/
+nft-market-front/.env.local
+nft-market-front/dist/
