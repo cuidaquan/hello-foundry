@@ -15,3 +15,4 @@ docs/
 cmd
 broadcast/
 token-bank-front/node_modules/
+token-bank-front/.env.local
