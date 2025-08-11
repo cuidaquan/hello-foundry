@@ -19,3 +19,5 @@ token-bank-front/.env.local
 nft-market-front/node_modules/
 nft-market-front/.env.local
 nft-market-front/dist/
+token-bank-listener/.env
+token-bank-listener/node_modules/
