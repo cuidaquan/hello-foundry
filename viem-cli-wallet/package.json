@@ -1,0 +1,25 @@
+{
+  "name": "viem-cli-wallet",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "wallet.js",
+  "bin": {
+    "viem-wallet": "./wallet.js"
+  },
+  "scripts": {
+    "start": "node wallet.js",
+    "generate": "node wallet.js generate",
+    "balance": "node wallet.js balance",
+    "transfer": "node wallet.js transfer",
+    "info": "node wallet.js info"
+  },
+  "keywords": ["viem", "wallet", "cli", "ethereum", "erc20"],
+  "author": "",
+  "license": "ISC",
+  "description": "基于 Viem.js 的命令行钱包",
+  "dependencies": {
+    "commander": "^14.0.0",
+    "dotenv": "^17.2.1",
+    "viem": "^2.33.3"
+  }
+}

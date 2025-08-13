@@ -22,3 +22,5 @@ nft-market-front/dist/
 nft-market-event-listener/.env
 nft-market-event-listener/node_modules/
 nft-market-event-listener/package-lock.json
+viem-cli-wallet/node_modules/
+viem-cli-wallet/package-lock.json
