@@ -25,3 +25,6 @@ nft-market-event-listener/package-lock.json
 viem-cli-wallet/node_modules/
 viem-cli-wallet/package-lock.json
 viem-cli-wallet/wallet.json
+bank-frontend/dist/
+bank-frontend/node_modules/
+bank-frontend/package-lock.json
