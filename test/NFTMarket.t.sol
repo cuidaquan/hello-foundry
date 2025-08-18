@@ -292,6 +292,15 @@ contract NFTMarketTest is Test {
 
         // 随机买家：排除 0 地址与 seller
         vm.assume(randomBuyer != address(0) && randomBuyer != seller);
+        
+        // 确保随机买家是一个有效的ERC721接收者
+        // 通过检查代码长度来判断是否为合约地址
+        uint256 codeSize;
+        assembly {
+            codeSize := extcodesize(randomBuyer)
+        }
+        // 如果是合约地址，跳过此测试（因为我们无法确保它实现了ERC721Receiver接口）
+        vm.assume(codeSize == 0); // 只测试EOA地址
 
         // 准备NFT: 给卖家新铸造并批准
         uint256 tokenId = nft.mint(seller, "ipfs://fuzz");
