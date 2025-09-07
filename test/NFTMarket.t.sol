@@ -39,7 +39,7 @@ contract NFTMarketTest is Test {
 
     function test_List_Success() public {
         uint256 tokenId = 0;
-        uint256 price = 100 ether;
+        uint96 price = 100 ether;
 
         vm.expectEmit(true, true, true, true, address(market));
         emit NFTMarket.NFTListed(_nextListingId(), seller, address(nft), tokenId, price);
@@ -71,7 +71,7 @@ contract NFTMarketTest is Test {
         // 非持有人上架
         vm.prank(buyer);
         vm.expectRevert(bytes("You don't own this NFT"));
-        market.list(tokenId, 10 ether);
+        market.list(tokenId, uint96(10 ether));
     }
 
     function test_List_Fail_NotApproved() public {
@@ -80,22 +80,22 @@ contract NFTMarketTest is Test {
         // 未批准市场
         vm.prank(seller);
         vm.expectRevert(bytes("Market not approved to transfer NFT"));
-        market.list(tokenId, 10 ether);
+        market.list(tokenId, uint96(10 ether));
     }
 
     function test_List_Fail_ListAgain_NotOwnerAfterListed() public {
         uint256 tokenId = 0;
         vm.prank(seller);
-        market.list(tokenId, 10 ether);
+        market.list(tokenId, uint96(10 ether));
         // 再次上架同一NFT（已托管在市场，卖家不再是所有者）
         vm.prank(seller);
         vm.expectRevert(bytes("You don't own this NFT"));
-        market.list(tokenId, 20 ether);
+        market.list(tokenId, uint96(20 ether));
     }
 
     // ============ 购买：成功与各类失败（buyNFT 路径） ============
 
-    function _prepareActiveListing(uint256 tokenId, uint256 price) internal returns (uint256 listingId) {
+    function _prepareActiveListing(uint256 tokenId, uint96 price) internal returns (uint256 listingId) {
         // 如果NFT已不在卖家名下，重新铸造并批准
         if (nft.ownerOf(tokenId) != seller) {
             tokenId = nft.mint(seller, "ipfs://remined");
@@ -136,7 +136,7 @@ contract NFTMarketTest is Test {
 
     function test_Buy_Success_via_buyNFT() public {
         uint256 tokenId = 0;
-        uint256 price = 1000 ether;
+        uint96 price = uint96(1000 ether);
         uint256 listingId = _prepareActiveListing(tokenId, price);
 
         // 买家授权并购买
@@ -164,7 +164,7 @@ contract NFTMarketTest is Test {
 
     function test_Buy_Fail_SelfBuy() public {
         uint256 tokenId = 0;
-        uint256 listingId = _prepareActiveListing(tokenId, 100 ether);
+        uint256 listingId = _prepareActiveListing(tokenId, uint96(100 ether));
 
         vm.prank(seller);
         token.approve(address(market), type(uint256).max);
@@ -175,7 +175,7 @@ contract NFTMarketTest is Test {
 
     function test_Buy_Fail_RepeatBuy() public {
         uint256 tokenId = 0;
-        uint256 listingId = _prepareActiveListing(tokenId, 50 ether);
+        uint256 listingId = _prepareActiveListing(tokenId, uint96(50 ether));
 
         // 第一次购买成功
         vm.prank(buyer);
@@ -193,7 +193,7 @@ contract NFTMarketTest is Test {
 
     function test_Buy_Fail_InsufficientBalance() public {
         uint256 tokenId = 0;
-        uint256 price = 1_000_000_000 ether;
+        uint96 price = uint96(1_000_000_000 ether);
         uint256 listingId = _prepareActiveListing(tokenId, price);
 
         // buyer 余额不足
@@ -206,7 +206,7 @@ contract NFTMarketTest is Test {
 
     function test_Buy_Fail_InsufficientAllowance() public {
         uint256 tokenId = 0;
-        uint256 price = 100 ether;
+        uint96 price = uint96(100 ether);
         uint256 listingId = _prepareActiveListing(tokenId, price);
 
         // allowance 不足
@@ -221,7 +221,7 @@ contract NFTMarketTest is Test {
 
     function test_CallbackBuy_Success_Exact() public {
         uint256 tokenId = 0;
-        uint256 price = 200 ether;
+        uint96 price = uint96(200 ether);
         uint256 listingId = _prepareActiveListing(tokenId, price);
 
         // 事件
@@ -248,10 +248,10 @@ contract NFTMarketTest is Test {
 
     function test_CallbackBuy_Success_OverpayRefund() public {
         uint256 tokenId = 0;
-        uint256 price = 300 ether;
+        uint96 price = uint96(300 ether);
         uint256 listingId = _prepareActiveListing(tokenId, price);
 
-        uint256 payAmount = price + 50 ether; // 多付
+        uint256 payAmount = uint256(price) + 50 ether; // 多付
         uint256 feeRate = market.marketFeeRate();
         uint256 fee = (price * feeRate) / 10000;
         uint256 sellerAmount = price - fee;
@@ -273,7 +273,7 @@ contract NFTMarketTest is Test {
 
     function test_CallbackBuy_Fail_Underpay() public {
         uint256 tokenId = 0;
-        uint256 price = 400 ether;
+        uint96 price = uint96(400 ether);
         uint256 listingId = _prepareActiveListing(tokenId, price);
 
         vm.prank(buyer);
@@ -288,7 +288,7 @@ contract NFTMarketTest is Test {
         // 价格范围：0.01 - 10000 Token
         uint256 minPrice = 10**16; // 0.01 ether
         uint256 maxPrice = 10_000 ether;
-        uint256 price = bound(uint256(rawPrice), minPrice, maxPrice);
+        uint96 price = uint96(bound(uint256(rawPrice), minPrice, maxPrice));
 
         // 随机买家：排除 0 地址与 seller
         vm.assume(randomBuyer != address(0) && randomBuyer != seller);
@@ -337,7 +337,7 @@ contract NFTMarketTest is Test {
     function test_Invariant_MarketTokenBalanceEqualsAccumulatedFees() public {
         // 触发一次购买以产生手续费
         uint256 tokenId = 0;
-        uint256 price = 100 ether;
+        uint96 price = uint96(100 ether);
         uint256 listingId = _prepareActiveListing(tokenId, price);
 
         vm.prank(buyer);

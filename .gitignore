@@ -31,3 +31,4 @@ bank-frontend/package-lock.json
 multisig-wallet-frontend/dist/
 multisig-wallet-frontend/node_modules/
 multisig-wallet-frontend/package-lock.json
+.claude/

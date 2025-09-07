@@ -14,13 +14,13 @@ import "./MyNFT.sol";
  */
 contract NFTMarket is IERC721Receiver, ITokenReceiver, ReentrancyGuard, Ownable {
     
-    // 市场上架的NFT信息
+    // 市场上架的NFT信息 - 优化存储布局
     struct Listing {
-        address seller;      // 卖家地址
-        address nftContract; // NFT合约地址
-        uint256 tokenId;     // NFT ID
-        uint256 price;       // 价格（以ERC20代币计价）
-        bool active;         // 是否活跃
+        address seller;      // 卖家地址 (20 bytes)
+        address nftContract; // NFT合约地址 (20 bytes)
+        uint96 price;        // 价格（以ERC20代币计价，96位足够） (12 bytes)
+        uint256 tokenId;     // NFT ID (32 bytes)
+        bool active;         // 是否活跃 (1 byte, 打包到下一个slot)
     }
     
     // 支持的ERC20代币合约
@@ -38,8 +38,8 @@ contract NFTMarket is IERC721Receiver, ITokenReceiver, ReentrancyGuard, Ownable 
     // 上架ID计数器
     uint256 private _listingIdCounter;
     
-    // 市场手续费率 (基点，10000 = 100%)
-    uint256 public marketFeeRate = 250; // 2.5%
+    // 市场手续费率 (基点，10000 = 100%) - 使用更小的类型
+    uint16 public marketFeeRate = 250; // 2.5%
     
     // 累计的市场手续费
     uint256 public accumulatedFees;
@@ -69,7 +69,7 @@ contract NFTMarket is IERC721Receiver, ITokenReceiver, ReentrancyGuard, Ownable 
         uint256 tokenId
     );
     
-    event MarketFeeRateUpdated(uint256 oldRate, uint256 newRate);
+    event MarketFeeRateUpdated(uint16 oldRate, uint16 newRate);
     
     /**
      * @dev 构造函数
@@ -89,30 +89,36 @@ contract NFTMarket is IERC721Receiver, ITokenReceiver, ReentrancyGuard, Ownable 
      * @param tokenId NFT ID
      * @param price 价格（以ERC20代币计价）
      */
-    function list(uint256 tokenId, uint256 price) external nonReentrant {
+    function list(uint256 tokenId, uint96 price) external nonReentrant {
         require(price > 0, "Price must be greater than 0");
-        require(nftContract.ownerOf(tokenId) == msg.sender, "You don't own this NFT");
+        
+        address seller = msg.sender;
+        address nftAddr = address(nftContract);
+        
+        require(nftContract.ownerOf(tokenId) == seller, "You don't own this NFT");
         require(nftContract.getApproved(tokenId) == address(this) || 
-                nftContract.isApprovedForAll(msg.sender, address(this)), 
+                nftContract.isApprovedForAll(seller, address(this)), 
                 "Market not approved to transfer NFT");
-        require(nftToListing[address(nftContract)][tokenId] == 0, "NFT already listed");
+        require(nftToListing[nftAddr][tokenId] == 0, "NFT already listed");
         
-        uint256 listingId = ++_listingIdCounter;
-        
-        listings[listingId] = Listing({
-            seller: msg.sender,
-            nftContract: address(nftContract),
-            tokenId: tokenId,
-            price: price,
-            active: true
-        });
-        
-        nftToListing[address(nftContract)][tokenId] = listingId;
-        
-        // 将NFT转移到市场合约
-        nftContract.safeTransferFrom(msg.sender, address(this), tokenId);
-        
-        emit NFTListed(listingId, msg.sender, address(nftContract), tokenId, price);
+        unchecked {
+            uint256 listingId = ++_listingIdCounter;
+            
+            listings[listingId] = Listing({
+                seller: seller,
+                nftContract: nftAddr,
+                tokenId: tokenId,
+                price: price,
+                active: true
+            });
+            
+            nftToListing[nftAddr][tokenId] = listingId;
+            
+            // 将NFT转移到市场合约
+            nftContract.safeTransferFrom(seller, address(this), tokenId);
+            
+            emit NFTListed(listingId, seller, nftAddr, tokenId, price);
+        }
     }
     
     /**
@@ -122,30 +128,44 @@ contract NFTMarket is IERC721Receiver, ITokenReceiver, ReentrancyGuard, Ownable 
     function buyNFT(uint256 listingId) external nonReentrant {
         Listing storage listing = listings[listingId];
         require(listing.active, "Listing not active");
-        require(listing.seller != msg.sender, "Cannot buy your own NFT");
+        
+        address buyer = msg.sender;
+        address seller = listing.seller;
+        require(seller != buyer, "Cannot buy your own NFT");
         
         uint256 totalPrice = listing.price;
-        uint256 marketFee = (totalPrice * marketFeeRate) / 10000;
-        uint256 sellerAmount = totalPrice - marketFee;
+        uint256 marketFee;
+        uint256 sellerAmount;
         
-        require(paymentToken.balanceOf(msg.sender) >= totalPrice, "Insufficient token balance");
-        require(paymentToken.allowance(msg.sender, address(this)) >= totalPrice, "Insufficient token allowance");
-        
-        // 转移代币
-        require(paymentToken.transferFrom(msg.sender, listing.seller, sellerAmount), "Payment to seller failed");
-        if (marketFee > 0) {
-            require(paymentToken.transferFrom(msg.sender, address(this), marketFee), "Market fee payment failed");
-            accumulatedFees += marketFee;
+        unchecked {
+            marketFee = (totalPrice * marketFeeRate) / 10000;
+            sellerAmount = totalPrice - marketFee;
         }
         
+        require(paymentToken.balanceOf(buyer) >= totalPrice, "Insufficient token balance");
+        require(paymentToken.allowance(buyer, address(this)) >= totalPrice, "Insufficient token allowance");
+        
+        // 转移代币
+        require(paymentToken.transferFrom(buyer, seller, sellerAmount), "Payment to seller failed");
+        if (marketFee > 0) {
+            require(paymentToken.transferFrom(buyer, address(this), marketFee), "Market fee payment failed");
+            unchecked {
+                accumulatedFees += marketFee;
+            }
+        }
+        
+        // 缓存变量避免重复读取
+        uint256 tokenId = listing.tokenId;
+        address nftAddr = listing.nftContract;
+        
         // 转移NFT
-        nftContract.safeTransferFrom(address(this), msg.sender, listing.tokenId);
+        nftContract.safeTransferFrom(address(this), buyer, tokenId);
         
         // 更新状态
         listing.active = false;
-        delete nftToListing[listing.nftContract][listing.tokenId];
+        delete nftToListing[nftAddr][tokenId];
         
-        emit NFTSold(listingId, msg.sender, listing.seller, listing.nftContract, listing.tokenId, totalPrice);
+        emit NFTSold(listingId, buyer, seller, nftAddr, tokenId, totalPrice);
     }
     
     /**
@@ -157,14 +177,19 @@ contract NFTMarket is IERC721Receiver, ITokenReceiver, ReentrancyGuard, Ownable 
         require(listing.active, "Listing not active");
         require(listing.seller == msg.sender, "Only seller can delist");
         
+        // 缓存变量避免重复读取
+        address seller = listing.seller;
+        uint256 tokenId = listing.tokenId;
+        address nftAddr = listing.nftContract;
+        
         // 将NFT返还给卖家
-        nftContract.safeTransferFrom(address(this), listing.seller, listing.tokenId);
+        nftContract.safeTransferFrom(address(this), seller, tokenId);
         
         // 更新状态
         listing.active = false;
-        delete nftToListing[listing.nftContract][listing.tokenId];
+        delete nftToListing[nftAddr][tokenId];
         
-        emit NFTDelisted(listingId, listing.seller, listing.nftContract, listing.tokenId);
+        emit NFTDelisted(listingId, seller, nftAddr, tokenId);
     }
     
     /**
@@ -190,21 +215,30 @@ contract NFTMarket is IERC721Receiver, ITokenReceiver, ReentrancyGuard, Ownable 
         require(amount >= listing.price, "Insufficient payment amount");
         
         uint256 totalPrice = listing.price;
-        uint256 marketFee = (totalPrice * marketFeeRate) / 10000;
-        uint256 sellerAmount = totalPrice - marketFee;
+        uint256 marketFee;
+        uint256 sellerAmount;
+        
+        unchecked {
+            marketFee = (totalPrice * marketFeeRate) / 10000;
+            sellerAmount = totalPrice - marketFee;
+        }
         
         // 转移代币给卖家
         require(paymentToken.transfer(listing.seller, sellerAmount), "Payment to seller failed");
         
         // 处理市场手续费
         if (marketFee > 0) {
-            accumulatedFees += marketFee;
+            unchecked {
+                accumulatedFees += marketFee;
+            }
         }
         
         // 如果支付金额超过价格，退还多余部分
         if (amount > totalPrice) {
-            uint256 refund = amount - totalPrice;
-            require(paymentToken.transfer(from, refund), "Refund failed");
+            unchecked {
+                uint256 refund = amount - totalPrice;
+                require(paymentToken.transfer(from, refund), "Refund failed");
+            }
         }
         
         // 转移NFT
@@ -235,9 +269,9 @@ contract NFTMarket is IERC721Receiver, ITokenReceiver, ReentrancyGuard, Ownable 
      * @dev 设置市场手续费率 - 只有合约拥有者可以调用
      * @param newRate 新的手续费率（基点）
      */
-    function setMarketFeeRate(uint256 newRate) external onlyOwner {
+    function setMarketFeeRate(uint16 newRate) external onlyOwner {
         require(newRate <= 1000, "Fee rate cannot exceed 10%"); // 最大10%
-        uint256 oldRate = marketFeeRate;
+        uint16 oldRate = marketFeeRate;
         marketFeeRate = newRate;
         emit MarketFeeRateUpdated(oldRate, newRate);
     }
