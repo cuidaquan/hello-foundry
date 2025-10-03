@@ -1,0 +1,21 @@
+Compiling 1 files with Solc 0.8.29
+Solc 0.8.29 finished in 5.44s
+Compiler run successful!
+
+Ran 13 tests for test/NFTMarketUpgradeable.t.sol:NFTMarketUpgradeableTest
+[PASS] test_Upgrade_NewFunctionality() (gas: 2201100)
+[PASS] test_Upgrade_OnlyOwner() (gas: 1878922)
+[PASS] test_Upgrade_StatePreserved() (gas: 2165882)
+[PASS] test_V1_Buy_Success() (gas: 284285)
+[PASS] test_V1_Delist_Success() (gas: 168024)
+[PASS] test_V1_List_Success() (gas: 189344)
+[PASS] test_V1_SetMarketFeeRate() (gas: 20466)
+[PASS] test_V1_SetMarketFeeRate_OnlyOwner() (gas: 18479)
+[PASS] test_V1_WithdrawFees() (gas: 304392)
+[PASS] test_V2_MultipleSignatureListings() (gas: 2762779)
+[PASS] test_V2_SignatureListing_InvalidNonce() (gas: 2013073)
+[PASS] test_V2_SignatureListing_InvalidSignature() (gas: 2012470)
+[PASS] test_V2_SignatureListing_ReplayAttackPrevention() (gas: 2166365)
+Suite result: ok. 13 passed; 0 failed; 0 skipped; finished in 3.13ms (10.64ms CPU time)
+
+Ran 1 test suite in 21.43ms (3.13ms CPU time): 13 tests passed, 0 failed, 0 skipped (13 total tests)
