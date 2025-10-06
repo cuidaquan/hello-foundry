@@ -44,6 +44,36 @@ interface IMemeFactory {
         uint256 projectFee,
         uint256 creatorFee
     );
+
+    /**
+     * @dev Emitted when liquidity is added to Uniswap
+     * @param tokenAddress Address of the token
+     * @param ethAmount Amount of ETH added to liquidity
+     * @param tokenAmount Amount of tokens added to liquidity
+     * @param liquidityTokens Amount of liquidity tokens received
+     * @param pairAddress Address of the Uniswap pair
+     */
+    event LiquidityAdded(
+        address indexed tokenAddress,
+        uint256 ethAmount,
+        uint256 tokenAmount,
+        uint256 liquidityTokens,
+        address indexed pairAddress
+    );
+
+    /**
+     * @dev Emitted when tokens are bought through Uniswap
+     * @param tokenAddress Address of the token
+     * @param buyer Address of the buyer
+     * @param ethAmount Amount of ETH spent
+     * @param tokenAmount Amount of tokens received
+     */
+    event MemeBought(
+        address indexed tokenAddress,
+        address indexed buyer,
+        uint256 ethAmount,
+        uint256 tokenAmount
+    );
     
     // ============ Structs ============
     
@@ -58,6 +88,9 @@ interface IMemeFactory {
         uint256 price;
         address creator;
         bool exists;
+        bool liquidityAdded;
+        address pairAddress;
+        uint256 accumulatedFees;
     }
     
     // ============ Main Functions ============
@@ -82,6 +115,13 @@ interface IMemeFactory {
      * @param tokenAddr Address of the token to mint from
      */
     function mintMeme(address tokenAddr) external payable;
+
+    /**
+     * @dev Buy tokens through Uniswap when price is better than initial price
+     * @param tokenAddr Address of the token to buy
+     * @param minTokenAmount Minimum amount of tokens to receive
+     */
+    function buyMeme(address tokenAddr, uint256 minTokenAmount) external payable;
     
     // ============ View Functions ============
     
@@ -92,16 +132,20 @@ interface IMemeFactory {
      * @return totalSupply Total supply
      * @return currentSupply Current minted supply
      * @return perMint Amount per mint
-     * @return price Price per mint
+     * @return accumulatedFees Accumulated project fees
      * @return creator Token creator address
+     * @return liquidityAdded Whether liquidity has been added
+     * @return pairAddress Uniswap pair address
      */
     function getTokenInfo(address tokenAddr) external view returns (
         string memory symbol,
         uint256 totalSupply,
         uint256 currentSupply,
         uint256 perMint,
-        uint256 price,
-        address creator
+        uint256 accumulatedFees,
+        address creator,
+        bool liquidityAdded,
+        address pairAddress
     );
     
     /**
@@ -147,4 +191,18 @@ interface IMemeFactory {
      * @return denominator Fee denominator (10000 = 100%)
      */
     function FEE_DENOMINATOR() external view returns (uint256 denominator);
+
+    /**
+     * @dev Get the Uniswap V2 Router address
+     * @return router Address of the Uniswap V2 Router
+     */
+    function uniswapRouter() external view returns (address router);
+
+    /**
+     * @dev Get the current price of a token on Uniswap
+     * @param tokenAddr Address of the token
+     * @param ethAmount Amount of ETH to get token price for
+     * @return tokenAmount Amount of tokens that can be bought with ethAmount
+     */
+    function getUniswapPrice(address tokenAddr, uint256 ethAmount) external view returns (uint256 tokenAmount);
 }

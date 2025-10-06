@@ -44,7 +44,7 @@ contract MemeFactoryCompleteTest is Test {
     function setUp() public {
         // Deploy contracts
         implementation = new MemeToken();
-        factory = new MemeFactory(address(implementation), projectOwner);
+        factory = new MemeFactory(address(implementation), projectOwner, address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D));
         
         // Fund all accounts
         vm.deal(projectOwner, INITIAL_BALANCE);
@@ -68,8 +68,8 @@ contract MemeFactoryCompleteTest is Test {
         assertTrue(factory.isTokenDeployed(tokenAddr), "Token should be registered");
         
         // 验证代币信息
-        (string memory symbol, uint256 totalSupply, uint256 currentSupply, 
-         uint256 perMint, uint256 price, address creator) = factory.getTokenInfo(tokenAddr);
+        (string memory symbol, uint256 totalSupply, uint256 currentSupply,
+         uint256 perMint, uint256 price, address creator, , ) = factory.getTokenInfo(tokenAddr);
         
         assertEq(symbol, TEST_SYMBOL, "Symbol mismatch");
         assertEq(totalSupply, TEST_TOTAL_SUPPLY, "Total supply mismatch");
@@ -192,7 +192,7 @@ contract MemeFactoryCompleteTest is Test {
         assertEq(token.totalSupply(), TEST_PER_MINT, "Total supply should increase by perMint");
         
         // 验证工厂记录的当前供应量
-        (, , uint256 currentSupply, , , ) = factory.getTokenInfo(tokenAddr);
+        (, , uint256 currentSupply, , , , , ) = factory.getTokenInfo(tokenAddr);
         assertEq(currentSupply, TEST_PER_MINT, "Factory current supply tracking incorrect");
         
         console.log("=== Mint Amount Test ===");
@@ -251,7 +251,7 @@ contract MemeFactoryCompleteTest is Test {
             factory.mintMeme{value: TEST_PRICE}(tokenAddr);
             
             // 验证每次铸造后的供应量
-            (, , uint256 currentSupply, , , ) = factory.getTokenInfo(tokenAddr);
+            (, , uint256 currentSupply, , , , , ) = factory.getTokenInfo(tokenAddr);
             uint256 expectedSupply = TEST_PER_MINT * (i + 1);
             assertEq(currentSupply, expectedSupply, "Current supply tracking incorrect");
             assertEq(MemeToken(tokenAddr).totalSupply(), expectedSupply, "Token total supply incorrect");

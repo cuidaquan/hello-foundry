@@ -36,7 +36,8 @@ contract MemeFactoryScript is BaseScript {
         console.log("\n2. Deploying MemeFactory...");
         MemeFactory factory = new MemeFactory(
             address(implementation),
-            user // Use deployer as project owner
+            user, // Use deployer as project owner
+            address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D) // Uniswap V2 Router
         );
         console.log("MemeFactory deployed at: %s", address(factory));
         saveContract("MemeFactory", address(factory));

@@ -57,8 +57,8 @@ contract MemeFactoryInteractScript is BaseScript {
         // Test 2: Verify token information
         console.log("\n=== Test 2: Verifying Token Information ===");
         
-        (string memory retSymbol, uint256 retTotalSupply, uint256 currentSupply, 
-         uint256 retPerMint, uint256 retPrice, address creator) = factory.getTokenInfo(tokenAddr);
+        (string memory retSymbol, uint256 retTotalSupply, uint256 currentSupply,
+         uint256 retPerMint, uint256 retPrice, address creator, , ) = factory.getTokenInfo(tokenAddr);
         
         console.log("Token Information:");
         console.log("- Symbol: %s", retSymbol);
@@ -95,7 +95,7 @@ contract MemeFactoryInteractScript is BaseScript {
         console.log("First deployed token: %s", firstToken);
 
         // Verify current supply updated
-        (, , uint256 newCurrentSupply, , , ) = factory.getTokenInfo(tokenAddr);
+        (, , uint256 newCurrentSupply, , , , , ) = factory.getTokenInfo(tokenAddr);
         console.log("Updated current supply: %s tokens", newCurrentSupply / 10**18);
         require(newCurrentSupply == perMint, "Current supply not updated");
         console.log("[OK] Factory state verified");
