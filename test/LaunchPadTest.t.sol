@@ -56,7 +56,7 @@ contract LaunchPadTest is Test {
         mockWETH = address(new MockWETH());
         
         // Deploy mock Uniswap contracts
-        mockFactory = new MockUniswapV2Factory();
+        mockFactory = new MockUniswapV2Factory(address(this));
         mockPair = new MockUniswapV2Pair();
         mockRouter = new MockUniswapV2Router(address(mockFactory), mockWETH);
         

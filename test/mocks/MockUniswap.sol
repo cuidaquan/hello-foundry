@@ -37,7 +37,11 @@ contract MockUniswapV2Factory is IUniswapV2Factory {
     
     // For testing purposes
     address private mockPair;
-    
+
+    constructor(address _feeToSetter) {
+        feeToSetter = _feeToSetter;
+    }
+
     function setPair(address _mockPair) external {
         mockPair = _mockPair;
     }
@@ -100,6 +104,50 @@ contract MockUniswapV2Pair is IUniswapV2Pair {
     
     constructor() {
         factory = msg.sender;
+        blockTimestampLast = uint32(block.timestamp);
+    }
+
+    function initialize(address _token0, address _token1) external override {
+        require(msg.sender == factory, 'MockUniswapV2Pair: FORBIDDEN');
+        token0 = _token0;
+        token1 = _token1;
+    }
+
+    function setReserves(uint112 _reserve0, uint112 _reserve1) external {
+        // Update cumulative prices before changing reserves
+        _updateCumulativePrices();
+
+        reserve0 = _reserve0;
+        reserve1 = _reserve1;
+        blockTimestampLast = uint32(block.timestamp);
+
+        emit Sync(reserve0, reserve1);
+    }
+
+    function _updateCumulativePrices() internal {
+        uint32 blockTimestamp = uint32(block.timestamp);
+        uint32 timeElapsed = blockTimestamp - blockTimestampLast;
+
+        if (timeElapsed > 0 && reserve0 != 0 && reserve1 != 0) {
+            // Calculate price ratios in UQ112x112 format
+            price0CumulativeLast += uint256((uint224(reserve1) << 112) / reserve0) * timeElapsed;
+            price1CumulativeLast += uint256((uint224(reserve0) << 112) / reserve1) * timeElapsed;
+        }
+    }
+
+    function simulateTimeAndPriceChange(uint32 timeElapsed, uint112 newReserve0, uint112 newReserve1) external {
+        // Update cumulative prices with current reserves
+        if (timeElapsed > 0 && reserve0 != 0 && reserve1 != 0) {
+            price0CumulativeLast += uint256((uint224(reserve1) << 112) / reserve0) * timeElapsed;
+            price1CumulativeLast += uint256((uint224(reserve0) << 112) / reserve1) * timeElapsed;
+        }
+
+        // Update reserves and timestamp
+        reserve0 = newReserve0;
+        reserve1 = newReserve1;
+        blockTimestampLast = uint32(block.timestamp + timeElapsed);
+
+        emit Sync(reserve0, reserve1);
     }
     
     function getReserves() public view override returns (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) {
@@ -161,11 +209,7 @@ contract MockUniswapV2Pair is IUniswapV2Pair {
         emit Sync(reserve0, reserve1);
     }
     
-    function initialize(address _token0, address _token1) external override {
-        require(msg.sender == factory, "UniswapV2: FORBIDDEN");
-        token0 = _token0;
-        token1 = _token1;
-    }
+
 }
 
 contract MockUniswapV2Router is IUniswapV2Router {
