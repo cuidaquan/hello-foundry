@@ -6,6 +6,8 @@ solc-version = "0.8.29"
 via_ir = true
 optimizer = true
 optimizer_runs = 200
+auto_detect_solc = true
+solc = "0.8.29"
 
 fs_permissions = [
     { access = "read-write", path = "./deployments" },
