@@ -293,4 +293,71 @@ contract FlashSwapArbitrageTest is Test {
             console.log("PoolB price: 1 TokenA =", (reserve0B * 10**18) / reserve1B, "TokenB");
         }
     }
+
+    // Test using real Sepolia testnet contracts
+    function testArbitrageExecutionOnSepolia() public {
+        // Skip if not on Sepolia fork
+        vm.createSelectFork("sepolia");
+
+        // Real Sepolia contract addresses
+        address realTokenA = 0xB74b65845A9b66a870B2D67a58fc80aE17014713;
+        address realTokenB = 0x2Df21BbDd03AB078b012C2d51798620C16604959;
+        address realArbitrage = 0x44525F8d9ed3dC23919D88FC4B438328c17b8De7;
+
+        // Get real contracts
+        MyToken realTKA = MyToken(realTokenA);
+        MyToken realTKB = MyToken(realTokenB);
+        FlashSwapArbitrage realArbitrageContract = FlashSwapArbitrage(payable(realArbitrage));
+
+        // Get the owner of the arbitrage contract
+        address owner = realArbitrageContract.owner();
+        vm.startPrank(owner);
+
+        console.log("=== Testing on Sepolia Testnet ===");
+        console.log("TokenA:", realTokenA);
+        console.log("TokenB:", realTokenB);
+        console.log("Arbitrage:", realArbitrage);
+        console.log("Owner:", owner);
+
+        // Check initial balances
+        uint256 balanceBeforeA = realTKA.balanceOf(realArbitrage);
+        uint256 balanceBeforeB = realTKB.balanceOf(realArbitrage);
+
+        console.log("=== Initial Balances ===");
+        console.log("Arbitrage TokenA balance:", balanceBeforeA);
+        console.log("Arbitrage TokenB balance:", balanceBeforeB);
+
+        // Try to execute arbitrage with small amount
+        uint256 arbitrageAmount = 1 * 10**18; // 1 TokenB
+
+        // Check if the factories exist and have pairs
+        console.log("=== Checking Factory Addresses ===");
+
+        // Try to call the factories to see if they exist
+        try realArbitrageContract.startArbitrage(
+            0x05e6EF588D2DfC32aA8CCd5766ce355b3eb67700, // FactoryA (correct address)
+            0x50f0d2adcB69683205Dc86e1891D84133eCe1043, // FactoryB (correct address)
+            realTokenB,  // Borrow TokenB
+            realTokenA,  // Target TokenA
+            arbitrageAmount
+        ) {
+            console.log("=== Arbitrage Executed Successfully ===");
+
+            uint256 balanceAfterA = realTKA.balanceOf(realArbitrage);
+            uint256 balanceAfterB = realTKB.balanceOf(realArbitrage);
+
+            console.log("Final TokenA balance:", balanceAfterA);
+            console.log("Final TokenB balance:", balanceAfterB);
+
+            if (balanceAfterB > balanceBeforeB) {
+                console.log("Profit earned:", balanceAfterB - balanceBeforeB, "TokenB");
+            }
+        } catch Error(string memory reason) {
+            console.log("Arbitrage failed:", reason);
+        } catch {
+            console.log("Arbitrage failed with unknown error");
+        }
+
+        vm.stopPrank();
+    }
 }
